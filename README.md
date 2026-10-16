@@ -17,3 +17,43 @@ Models with 2 billion parameters (such as Microsoft's ```BitNet b1.58 2B4T```) w
 #### Breaking GPU Tendency
 
 The addition operation is essentially designed to be very friendly to CPU width compromises,This architecture ushers in the era of Edge AI, enabling models as large as LLM and sophisticated low-level models to now be run locally on hardware architectures (HBM) such as the ARM series.such as smartphones, standard laptops, and even Raspberry Pi IoT devices without the need for a massive graphics card (VRAM) or a cloud connection at all.
+
+## Training model b1.58 
+
+From scratch, the b1.58 model training is not carried out using conventional training method concepts such as the usual *Post-Training Quantization (PTQ), the model is essentially trained with *high precision* which is then forcefully pruned to values ```-1, 0, 1``` this will lead to the mathematical consequence of *performance collapse.* Therefore, BitNet is designed through the **Quantization-Aware Training (QAT)** paradigm which is integrated directly into the *forward-backward pass cycle.*
+
+### Weight Quantity in Ternary Back-prop
+
+Each linear layer is replaced with a ```BitLinear``` layer before matrix operations are applied on each *forward pass,* the high-order *floating-point* weights (```\W ~ \R```) d converted to Ternary weights (```W_q \in \{-1, 0, 1\}```) using the absmax (*absolute maximum*) scaling function:
+
+#### Scaling Factor (\gamma):
+
+The average absolute magnitude value is calculated from the weight matrix to obtain the normalized scale: 
+
+```\gamma = \frac{1}{n} \sum \vert{}W\Vert{}```
+
+#### Ternary Quantization Function with Threshold:
+
+The weight is divided by ```\gamma```, then rounded to the nearest value between ```{-1, 0, 1}```:
+
+```W_q = \Round \(W/\gamma\)```
+
+Where the rounding function maps the values to the three points based on a certain threshold; such as the use of a modified sign function (*sign*) with a zero threshold.
+
+### Activation Quantization (INT8)
+
+The heavy matrix multiplication operation is *removed* and completely replaced with *addition*, act input activations (```X```) are also dynamically quantized into 8-bit (INT8) ranges per-token or per-block:
+
+```X_q = \Clip \(X × \{Q_b/\max\(\vertX\vert\)\}, -Q_b, Q_b -1\)```
+
+Where ```Q_b = 2^8-1 = 127```. With this representation, the complicated matrix multiplication is transformed into a very efficient integer matrix multiplication operation.
+
+### Backpropagation Challenge: Straight-Through Estimator (STE) 
+
+The quantization rounding function (```W_q = \Round \(W/\gamma\)```) has a derivative (*Gradient*) of zero at almost all points and infinity at the transition points.This makes standard backpropagation impossible to run.
+
+To address this, BitNet uses a Straight-Through Estimator (STE) that ignores the rounding operation and passes the gradient directly to the original floating-point weights (```W```).
+
+```\frac{\partial \mathcal{L}}{\partial W} \approx \frac{\partial \mathcal{L}}{\partial W_q}```
+
+Operations like AdamW store high precision *Master Weight* like the neural networks (AI) architecture I will build here using (*FP16 or BF16*) y which is then updated by the *Back-prop* gradient, while the Ternary weights (```W_q```) are only used temporarily during the *forward pass* to calculate the *loss* and activation.

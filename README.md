@@ -1,4 +1,4 @@
-## Abstraction 1.58 bit (BitLinear)
+## Abstraction 1.58 bit (BitLinear) 
 
 1.58 bit is an architecture with a pivoting structure between the values ```(-1, 0, 1)``` which requires only a logarithmic memory space of ```$\log_2(3) ≈ 1.58 bit\$``` The crucial addition of the number "0" in the Grover matrix acts as a filter or *connection breaker* (*sparsity*) which allows the model to be adaptive in scaling by filtering the window context in the facet process to reach the variant (probability) empathetically; remove important noise and unimportant noise.
 
@@ -57,3 +57,29 @@ To address this, BitNet uses a Straight-Through Estimator (STE) that ignores the
 ```\frac{\partial \mathcal{L}}{\partial W} \approx \frac{\partial \mathcal{L}}{\partial W_q}```
 
 Operations like AdamW store high precision *Master Weight* like the neural networks (AI) architecture I will build here using (*FP16 or BF16*) y which is then updated by the *Back-prop* gradient, while the Ternary weights (```W_q```) are only used temporarily during the *forward pass* to calculate the *loss* and activation.
+
+## The LLM with the basis {AbsMax (Absolute maximum) :: b1.58}
+
+Quantization-Aware Training (QAT) architecture is structured on Continuous value mappings from Floating-point (FP16/BF16) interwoven in a very limited *discrete* domain; y namely ```{-1, 0, 1}``` for weights, and in this architecture the use of INT8 is used for activation, so that the weight vector does not lose the semantic information of the model.
+
+#### AbsMax on weight
+
+For the weight matrix ```W``` BitNet b1.58 using the BasMax variant in the form of Mean Absolute Value as the scaling factor (```\gamma```):
+
+```\gamma = \frac{1}{n} \sum_{i=1}^{n} \vert{}w_i\vert{}```
+
+the weight tensor is divided by ```\gamma``` so that its values are within the standardized range. After normalization, the weights are rounded to the nearest integer via the *threshold* function:
+
+```\W_q = \Round \(W/\gamma\)```
+
+The result of the operation will produce a matrix value that purely contains discrete ```-1, 0, 1``` factors ```\gamma``` are stored separately as *scale factors* per-layer or per-block for dik to be multiplied again during the matrix scale dequantization process (scaling factor recovery) takes place.
+
+#### AbsMax on Activation 
+
+Unlike weights which are static after training is complete, activations (```X```) are dynamic every time a new token is processed. AbsMax scaling on Activation is done per-token or per-block to keep the range in the INT8 format ```Q_b = 127```:
+
+```\gamma_x = \frac{\max(\vert{}X\vert{})}{Q_b}```
+    ```\X_q = \Clip\(Round\(X·{Q_b/\max\(\vert\X\vert\)\), -Q_b, Q_b - 1)\```
+
+The importance of the AbsMax function approach is preventing numerical overflow or underflow when large matrix multiplication operations are simplified to pure integer addition.
+

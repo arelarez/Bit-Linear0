@@ -36,7 +36,7 @@ The average absolute magnitude value is calculated from the weight matrix to obt
 
 The weight is divided by ```\gamma```, then rounded to the nearest value between ```{-1, 0, 1}```:
 
-```W_q = \Round \(W/\gamma\)```
+```\W_q = \Round (\frac{W}{\gamma})```
 
 Where the rounding function maps the values to the three points based on a certain threshold; such as the use of a modified sign function (*sign*) with a zero threshold.
 
@@ -44,7 +44,7 @@ Where the rounding function maps the values to the three points based on a certa
 
 The heavy matrix multiplication operation is *removed* and completely replaced with *addition*, act input activations (```X```) are also dynamically quantized into 8-bit (INT8) ranges per-token or per-block:
 
-```X_q = \Clip \(X × \{Q_b/\max\(\vertX\vert\)\}, -Q_b, Q_b -1\)```
+```\X_q = \Clip (X × {Q_b}{\max(\vert{}X\vert{})}, -Q_b, Q_b - 1)```
 
 Where ```Q_b = 2^8-1 = 127```. With this representation, the complicated matrix multiplication is transformed into a very efficient integer matrix multiplication operation.
 
@@ -70,7 +70,7 @@ For the weight matrix ```W``` BitNet b1.58 using the BasMax variant in the form 
 
 the weight tensor is divided by ```\gamma``` so that its values are within the standardized range. After normalization, the weights are rounded to the nearest integer via the *threshold* function:
 
-```\W_q = \Round \(W/\gamma\)```
+```\W_q = \Round (\frac{W}{\gamma})```
 
 The result of the operation will produce a matrix value that purely contains discrete ```-1, 0, 1``` factors ```\gamma``` are stored separately as *scale factors* per-layer or per-block for dik to be multiplied again during the matrix scale dequantization process (scaling factor recovery) takes place.
 
@@ -82,4 +82,21 @@ Unlike weights which are static after training is complete, activations (```X```
     ```\X_q = \Clip\(Round\(X·{Q_b/\max\(\vert\X\vert\)\), -Q_b, Q_b - 1)\```
 
 The importance of the AbsMax function approach is preventing numerical overflow or underflow when large matrix multiplication operations are simplified to pure integer addition.
+
+
+## Roadmap LLM b1.58
+
+The Custom PyTorch Module integrated into the C++ programming language structure on the Ternary LLM model that I created uses an integer-based matrix multiplication operation or Straight-Through Estimator (STE) base where; my application Activation quantization is applied to INT8 then the weight quantization *Master Weight* is optimized with Ternary (```-1, 0, 1```) using the AbsMax function. This is all because rounding (```\Round```) has zero derivative at almost all points, that's why the backward pass function is optimized using Custom STE so that so that the gradient can flow directly to the high-precision master weights.
+
+## The backbone with RMSNorm & SwiGLU
+
+Inter-layer quantization via NLL and FFN is normalized using RMSNorm (Root Mean Square Normalization) because it is more stable combined with extreme quantization, Use of ```SwiGLU`` (Swish-Gated Linear Unit) in Feed-forward Network (FFN) is aimed at maximizing the capacity of non-linear representation.
+
+- Then to adjust the long window context, it is applied using Rotary Position Embedding (RoPE).
+
+### Optimizer & Master Weights Management (FP16, b1.58)
+
+**Master Weight (FP16/BF16)**: Stored in the memory of the Optimizer (such as AdamW) to receive precise gradient divisions.
+
+**Ternary Weights (1.57-bit)**: Calculated on-the-fly from the Master Weight at the start of each forward pass.
 
